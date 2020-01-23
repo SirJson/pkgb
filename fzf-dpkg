@@ -59,7 +59,7 @@ install)
 purge)
     fzf_apt_purge
     ;;
-clean-purge)
+purge-clean)
     fzf_apt_cleanpurge
     ;;
 list)
@@ -68,11 +68,11 @@ list)
 upgrade)
     fzf_apt_upgrade
     ;;
-clean-upgrade)
+upgrade-clean)
     fzf_apt_cleanupgrade
     ;;
 *)
     echo "Unknown action $1"
-    echo 'Usage: fzf-dpkg (install | purge | clean-purge | list | upgrade | clean-upgrade)'
+    echo 'Usage: fzf-dpkg (install | purge | purge-clean | list | upgrade | upgrade-clean)'
     ;;
 esac
