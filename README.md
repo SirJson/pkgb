@@ -7,7 +7,7 @@ Inspired by [fzf-apt](https://github.com/krickelkrakel/fzf-apt).
 - Package info preview
 - Exact search
 - Local package information query
-- Install / uninstall directly from script
+- Install / Uninstall directly from script
 
 Depends on [fzf](https://github.com/junegunn/fzf), bash and awk.
 
