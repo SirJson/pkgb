@@ -1,6 +1,6 @@
 # fzf-dpkg
 
-Inspired by [https://github.com/krickelkrakel/fzf-apt](fzf-apt).
+Inspired by [fzf-apt](https://github.com/krickelkrakel/fzf-apt).
 
 ## Differences / Improvements:
 
@@ -9,15 +9,19 @@ Inspired by [https://github.com/krickelkrakel/fzf-apt](fzf-apt).
 - Local package information query
 - Install / uninstall directly from script
 
-Depends on fzf, bash and awk.
+Depends on [fzf](https://github.com/junegunn/fzf), bash and awk.
+
+This script will request root if required or sudo if installed on your system.
 
 ## Usage
 
-fzf-dpkg <action>
+`fzf-dpkg <action>`
 
-Actions:
-    install
-    purge
-    list
+### Actions:
+- `install`: Will show you a list of available packages and install them with apt-get install
+- `purge`: Will show you a list of installed packages and purge them with apt-get purge
+- `list`: Will show you a list of installed packages and additional information in the preview window
 
-This script will request root if required or sudo if installed on your system.
+### Example
+
+`fzf-dpkg install`
