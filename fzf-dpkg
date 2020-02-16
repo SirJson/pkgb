@@ -1,6 +1,23 @@
 #!/bin/bash
 
-export FZF_DEFAULT_OPTS="--exact --border --cycle --multi --layout=reverse-list $FZF_DEFAULT_OPTS"
+_set_fzf_default_opts() {
+    local color00='#263238'
+    local color01='#2C393F'
+    local color04='#C9CCD3'
+    local color06='#D5DBE5'
+    local color0A='#FFCC00'
+    local color0C='#80CBC4'
+    local color0D='#89DDFF'
+
+    INFO_HEADER="<ESC> Exit, <PgUp> Preview up, <PgDown> Preview down"
+
+    export FZF_DEFAULT_OPTS="
+      --color=bg+:$color01,bg:$color00,spinner:$color0C,hl:$color0D
+      --color=fg:$color04,header:$color0D,info:$color0A,pointer:$color0C
+      --color=marker:$color0C,fg+:$color06,prompt:$color0A,hl+:$color0D
+      -m --cycle --border --layout=reverse-list --preview-window=right:wrap --exact --no-height --cycle --multi --bind pgdn:preview-down --bind pgup:preview-up --header \"$INFO_HEADER\""
+}
+
 SUDO_CMD=$(command -v sudo)
 
 root_check() {
@@ -24,10 +41,11 @@ fzf_apt_install() {
 
     $SUDO_CMD apt-get update
 
-    installed_pkg=get_installed_pkgs
+    installed_pkg=$(get_installed_pkgs)
     all_pkg=$(apt-cache pkgnames)
+    _set_fzf_default_opts
 
-    awk '{ h[$0] = ! h[$0] } END { for (k in h) if (h[k]) print k }' <(echo "$installed_pkg") <(echo "$all_pkg") | fzf --preview='apt-cache show {}' --header='Install packages. <Tab> = Select multiple packages. <Enter> = Install one or more packages. <ESC> = Exit' --bind "enter:execute($SUDO_CMD apt-get install -y {+})+accept"
+    echo "$installed_pkg" "$all_pkg" | tr ' ' '\n' | sort | uniq -u | fzf --preview='apt-cache show {}' --header='Install packages. <Tab> = Select multiple packages. <Enter> = Install one or more packages. <ESC> = Exit' --bind "enter:execute($SUDO_CMD apt-get install -y {+})+accept"
 }
 
 fzf_apt_cleanpurge() {
@@ -37,14 +55,15 @@ fzf_apt_cleanpurge() {
 fzf_apt_purge() {
     root_check
     local selection
+    _set_fzf_default_opts
     selection=$(get_installed_pkgs | fzf --preview='dpkg-query -s {}' --header='Uninstall packages. <Tab> = Select multiple packages. <Enter> = Uninstall one or more packages. <ESC> = Exit')
     if [[ -n "$selection" ]]; then
-        selection=$(echo "$selection" | sd '\n' ' ')
-        $SUDO_CMD apt-get purge -y "$selection"
+        echo "$selection" | tr '\n' ' ' | xargs "$SUDO_CMD" apt-get purge -y
     fi
 }
 
 fzf_apt_list() {
+    _set_fzf_default_opts
     get_installed_pkgs | fzf --preview='dpkg-query -s {}' --header='Installed packages list. <ESC> = Exit'
 }
 
