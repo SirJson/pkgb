@@ -1,23 +1,6 @@
 #!/bin/bash
-
-_set_fzf_default_opts() {
-    local color00='#263238'
-    local color01='#2C393F'
-    local color04='#C9CCD3'
-    local color06='#D5DBE5'
-    local color0A='#FFCC00'
-    local color0C='#80CBC4'
-    local color0D='#89DDFF'
-
-    INFO_HEADER="<ESC> Exit, <PgUp> Preview up, <PgDown> Preview down"
-
-    export FZF_DEFAULT_OPTS="
-      --color=bg+:$color01,bg:$color00,spinner:$color0C,hl:$color0D
-      --color=fg:$color04,header:$color0D,info:$color0A,pointer:$color0C
-      --color=marker:$color0C,fg+:$color06,prompt:$color0A,hl+:$color0D
-      -m --cycle --border --layout=reverse-list --preview-window=right:wrap --exact --no-height --cycle --multi --bind pgdn:preview-down --bind pgup:preview-up --header \"$INFO_HEADER\""
-}
-
+INFO_HEADER="<ESC> Exit, <PgUp> Preview up, <PgDown> Preview down"
+FZF_OPTS=("--layout=reverse-list" "--no-height" "--multi" "--bind" "pgdn:preview-down" "--bind" "pgup:preview-up" "--header" "$INFO_HEADER")
 SUDO_CMD=$(command -v sudo)
 
 root_check() {
@@ -43,28 +26,34 @@ fzf_apt_install() {
 
     installed_pkg=$(get_installed_pkgs)
     all_pkg=$(apt-cache pkgnames)
-    _set_fzf_default_opts
 
-    echo "$installed_pkg" "$all_pkg" | tr ' ' '\n' | sort | uniq -u | fzf --preview='apt-cache show {}' --header='Install packages. <Tab> = Select multiple packages. <Enter> = Install one or more packages. <ESC> = Exit' --bind "enter:execute($SUDO_CMD apt-get install -y {+})+accept"
+    echo "$installed_pkg" "$all_pkg" | tr ' ' '\n' | sort | uniq -u | fzf "${FZF_OPTS[@]}" --preview='apt-cache show {}' --prompt='Install packages > ' --bind "enter:execute($SUDO_CMD apt-get install -y {+})+accept"
 }
 
 fzf_apt_cleanpurge() {
     fzf_apt_purge && $SUDO_CMD apt-get autoremove
 }
 
+fzf_apt_remove() {
+    root_check
+    local selection
+    selection=$(get_installed_pkgs | fzf "${FZF_OPTS[@]}" --preview='dpkg-query -s {}' --prompt='Uninstall packages > ')
+    if [[ -n "$selection" ]]; then
+        echo "$selection" | tr '\n' ' ' | xargs "$SUDO_CMD" apt-get remove -y 
+    fi
+}
+
 fzf_apt_purge() {
     root_check
     local selection
-    _set_fzf_default_opts
-    selection=$(get_installed_pkgs | fzf --preview='dpkg-query -s {}' --header='Uninstall packages. <Tab> = Select multiple packages. <Enter> = Uninstall one or more packages. <ESC> = Exit')
+    selection=$(get_installed_pkgs | fzf "${FZF_OPTS[@]}" --preview='dpkg-query -s {}' --prompt='Uninstall packages > ')
     if [[ -n "$selection" ]]; then
-        echo "$selection" | tr '\n' ' ' | xargs "$SUDO_CMD" apt-get purge -y
+        echo "$selection" | tr '\n' ' ' | xargs "$SUDO_CMD" apt-get purge -y 
     fi
 }
 
 fzf_apt_list() {
-    _set_fzf_default_opts
-    get_installed_pkgs | fzf --preview='dpkg-query -s {}' --header='Installed packages list. <ESC> = Exit'
+    get_installed_pkgs | fzf --preview='dpkg-query -s {}' --prompt='Installed packages list > '
 }
 
 fzf_apt_upgrade() {
@@ -77,26 +66,29 @@ fzf_apt_cleanupgrade() {
 }
 
 case $1 in
-add)
-    fzf_apt_install
+install)
+    fzf_apt_install $2
     ;;
-rm)
-    fzf_apt_purge
+purge)
+    fzf_apt_purge $2
     ;;
-clean-rm)
-    fzf_apt_cleanpurge
+purge+autoremove)
+    fzf_apt_cleanpurge $2
     ;;
-ls)
+list)
     fzf_apt_list
     ;;
-update)
-    fzf_apt_upgrade
+upgrade)
+    fzf_apt_upgrade $2
     ;;
-clean-update)
-    fzf_apt_cleanupgrade
+remove)
+    fzf_apt_remove $2
+    ;;
+upgrade+autoremove)
+    fzf_apt_cleanupgrade $2
     ;;
 *)
     echo "Unknown action $1"
-    echo 'Usage: fzf-dpkg (add | rm | clean-rm | ls | update | clean-update)'
+    echo 'Usage: fzf-dpkg (install | purge | remove | list | upgrade | purge+autoremove | upgrade+autoremove) [-y]'
     ;;
 esac
