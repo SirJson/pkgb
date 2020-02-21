@@ -20,15 +20,14 @@ This script will request root if required or sudo if installed on your system.
 
 ### Actions
 
-- `add`: Will show you a list of available packages and install them with apt-get install
-- `rm`: Will show you a list of installed packages and purge them with apt-get purge
-- `clean-rm`: Like purge but will autoremove packages if applicable
-- `update`: Resynchronize the package index files from their sources and upgrades packages that are new
-- `update-clean`: Like upgrade but will autoremove packages if applicable
-- `ls`: Will show you a list of installed packages and additional information in the preview window
+- install`: Will show you a list of available packages and install them with apt-get install
+- `remove: Will show you a list of installed packages and purge them with apt-get purge
+- `purge`: Like purge but will autoremove packages if applicable
+- `upgrade`: Resynchronize the package index files from their sources and upgrades packages that are new
+- `upgrade+autoremove`: Like upgrade but will autoremove packages if applicable
+- `list`: Will show you a list of installed packages and additional information in the preview window
 
 ### Example
-
 ```bash
-$ fzf-dpkg add
+$ fzf-dpkg install
 ```
