@@ -6,7 +6,7 @@ SUDO_CMD=$(command -v sudo)
 root_check() {
     if [[ $EUID -ne 0 ]]; then
         if ! command -v sudo &>/dev/null; then
-            echo "You need to be root or use sudo to continue"
+            echo "You need to be root or install sudo to continue"
             exit 1
         fi
     fi
@@ -39,7 +39,7 @@ fzf_apt_remove() {
     local selection
     selection=$(get_installed_pkgs | fzf "${FZF_OPTS[@]}" --preview='dpkg-query -s {}' --prompt='Uninstall packages > ')
     if [[ -n "$selection" ]]; then
-        echo "$selection" | tr '\n' ' ' | xargs "$SUDO_CMD" apt-get remove -y 
+        echo "$selection" | tr '\n' ' ' | xargs "$SUDO_CMD" apt-get remove -y
     fi
 }
 
@@ -48,7 +48,7 @@ fzf_apt_purge() {
     local selection
     selection=$(get_installed_pkgs | fzf "${FZF_OPTS[@]}" --preview='dpkg-query -s {}' --prompt='Uninstall packages > ')
     if [[ -n "$selection" ]]; then
-        echo "$selection" | tr '\n' ' ' | xargs "$SUDO_CMD" apt-get purge -y 
+        echo "$selection" | tr '\n' ' ' | xargs "$SUDO_CMD" apt-get purge -y
     fi
 }
 
@@ -78,6 +78,9 @@ purge+autoremove)
 list)
     fzf_apt_list
     ;;
+list-export)
+    get_installed_pkgs
+    ;;
 upgrade)
     fzf_apt_upgrade $2
     ;;
@@ -89,6 +92,6 @@ upgrade+autoremove)
     ;;
 *)
     echo "Unknown action $1"
-    echo 'Usage: fzf-dpkg (install | purge | remove | list | upgrade | purge+autoremove | upgrade+autoremove) [-y]'
+    echo 'Usage: fzf-dpkg (install | purge | remove | list | upgrade | purge+autoremove | upgrade+autoremove | list-export) [-y]'
     ;;
 esac
