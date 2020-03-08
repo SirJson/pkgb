@@ -10,4 +10,5 @@ if [[ $EUID -ne 0 ]]; then
      exit 1
 fi
 chmod +x "$SCRIPTPATH/fzf-dpkg"
-cp -v "$SCRIPTPATH/fzf-dpkg" /usr/local/bin
+ln -s "$SCRIPTPATH/fzf-dpkg" /usr/local/bin/fzf-dpkg
+

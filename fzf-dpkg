@@ -1,6 +1,6 @@
 #!/bin/bash
-INFO_HEADER="<ESC> Exit, <PgUp> Preview up, <PgDown> Preview down"
-FZF_OPTS=("--layout=reverse-list" "--no-height" "--multi" "--bind" "pgdn:preview-down" "--bind" "pgup:preview-up" "--header" "$INFO_HEADER")
+INFO_HEADER="<ESC> Exit, <PgUp> Preview up, <PgDown> Preview down <F5> Apply"
+FZF_OPTS=("--layout=reverse-list" "--no-height" "--multi" "--bind" "pgdn:preview-down" "--exact" "--bind" "pgup:preview-up" "--header" "$INFO_HEADER")
 SUDO_CMD=$(command -v sudo)
 
 root_check() {
@@ -27,17 +27,17 @@ fzf_apt_install() {
     installed_pkg=$(get_installed_pkgs)
     all_pkg=$(apt-cache pkgnames)
 
-    echo "$installed_pkg" "$all_pkg" | tr ' ' '\n' | sort | uniq -u | fzf "${FZF_OPTS[@]}" --preview='apt-cache show {}' --prompt='Install packages > ' --bind "enter:execute($SUDO_CMD apt-get install -y {+})+accept"
+    echo "$installed_pkg" "$all_pkg" | tr ' ' '\n' | sort | uniq -u | fzf "${FZF_OPTS[@]}" --query=$1 --preview='apt-cache show {}' --prompt='Install packages > ' --bind "enter:execute($SUDO_CMD apt-get install -y {+})+accept" --bind "F5:execute($SUDO_CMD apt-get install -y {+})+accept"
 }
 
 fzf_apt_cleanpurge() {
-    fzf_apt_purge && $SUDO_CMD apt-get autoremove
+    fzf_apt_purge $1 && $SUDO_CMD apt-get autoremove
 }
 
 fzf_apt_remove() {
     root_check
     local selection
-    selection=$(get_installed_pkgs | fzf "${FZF_OPTS[@]}" --preview='dpkg-query -s {}' --prompt='Uninstall packages > ')
+    selection=$(get_installed_pkgs | fzf "${FZF_OPTS[@]}" --preview='dpkg-query -s {}' --query=$1 --prompt='Uninstall packages > ')
     if [[ -n "$selection" ]]; then
         echo "$selection" | tr '\n' ' ' | xargs "$SUDO_CMD" apt-get remove -y
     fi
@@ -46,14 +46,14 @@ fzf_apt_remove() {
 fzf_apt_purge() {
     root_check
     local selection
-    selection=$(get_installed_pkgs | fzf "${FZF_OPTS[@]}" --preview='dpkg-query -s {}' --prompt='Uninstall packages > ')
+    selection=$(get_installed_pkgs | fzf "${FZF_OPTS[@]}" --preview='dpkg-query -s {}' --query=$1 --prompt='Uninstall packages > ')
     if [[ -n "$selection" ]]; then
         echo "$selection" | tr '\n' ' ' | xargs "$SUDO_CMD" apt-get purge -y
     fi
 }
 
 fzf_apt_list() {
-    get_installed_pkgs | fzf --preview='dpkg-query -s {}' --prompt='Installed packages list > '
+    get_installed_pkgs | fzf --preview='dpkg-query -s {}' --prompt='Installed packages list > ' --query=$1
 }
 
 fzf_apt_upgrade() {
