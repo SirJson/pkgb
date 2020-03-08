@@ -1,0 +1,154 @@
+#!/bin/bash
+set -Euo pipefail
+_DEBUGPIPE=''
+
+CLEAN=0
+REFRESH=1
+ASSUMEYES="-y"
+
+if [[ -f "$HOME/.pkgbdebug" ]]; then
+    _DEBUGPIPE=$(mktemp)
+    echo "Started in Debug mode!"
+    echo "Debug pipe: $_DEBUGPIPE"
+    _trace_handler() {
+        if [[ ! -p $_DEBUGPIPE ]]; then
+            mkfifo "$_DEBUGPIPE"
+        fi
+        echo -e "\n[DBG]➜\t$BASH_COMMAND" &>"$_DEBUGPIPE"
+    }
+    set -o functrace
+    trap '_trace_handler' DEBUG
+fi
+
+_terminate_handler() {
+    printf '\e[0m'
+    printf '\n\e[38;2;200;0;0m%s\e[0m\n' "!! > Caught Terminate signal"
+    exit 1
+}
+
+_error_handler() {
+    ORIGIN=$1
+    ERRNO=$2
+    printf '\e[0m'
+    printf '\n\e[1m\e[48;2;236;240;241m\e[38;2;200;0;0m%s\e[0m' "!! > Internal failure. Command '$ORIGIN' failed with $ERRNO"
+    exit 1
+}
+trap '_terminate_handler' SIGINT SIGTERM
+trap '_error_handler $BASH_COMMAND $?' ERR
+
+ACTIONS=('add' 'del' 'export' 'list' 'purge' 'upgrade' 'help')
+INFO_HEADER="<ESC> Exit, <PgUp> Preview up, <PgDown> Preview down <F5> Apply"
+FZF_OPTS=("--no-height" "--multi" "--bind" "pgdn:preview-down" "--exact" "--bind" "pgup:preview-up" "--header" "$INFO_HEADER")
+
+SUDO_CMD=$(command -v sudo)
+
+_get_installed_pkgs() {
+    dpkg-query --show --showformat='${Package} ${db:Status-Status}\n' | grep installed | awk '{print $1}'
+}
+
+_pkgb_clean() {
+    $SUDO_CMD apt-get autoremove "$ASSUMEYES"
+}
+
+_pkgb_refresh() {
+    if [[ $REFRESH = 1 ]]; then
+        $SUDO_CMD apt-get update
+    fi
+}
+
+pkgb_add() {
+    local installed_pkg
+    local all_pkg
+    local selection
+
+    _pkgb_refresh
+
+    installed_pkg=$(_get_installed_pkgs)
+    all_pkg=$(apt-cache pkgnames)
+
+    selection=$(echo "$installed_pkg" "$all_pkg" | tr ' ' '\n' | sort | uniq -u | fzf "${FZF_OPTS[@]}" --query="$1" --preview='apt-cache show {}' --prompt='Install packages > ' --bind "F5:accept")
+    if [[ -n "$selection" ]]; then
+        echo "$selection" | tr '\n' ' ' | xargs "$SUDO_CMD" apt-get install "$ASSUMEYES"
+    fi
+}
+
+pkgb_del() {
+    local selection
+    selection=$(_get_installed_pkgs | fzf "${FZF_OPTS[@]}" --preview='dpkg-query -s {}' --query="$1" --prompt='Uninstall packages > ')
+    if [[ -n "$selection" ]]; then
+        echo "$selection" | tr '\n' ' ' | xargs "$SUDO_CMD" apt-get remove "$ASSUMEYES"
+    fi
+}
+
+pkgb_purge() {
+    local selection
+    selection=$(_get_installed_pkgs | fzf "${FZF_OPTS[@]}" --preview='dpkg-query -s {}' --query="$1" --prompt='Uninstall packages > ')
+    if [[ -n "$selection" ]]; then
+        echo "$selection" | tr '\n' ' ' | xargs "$SUDO_CMD" apt-get purge "$ASSUMEYES"
+    fi
+}
+
+pkgb_list() {
+    _get_installed_pkgs | fzf --preview='dpkg-query -s {}' --bind esc:accept --prompt='Installed packages list > ' --query="$1"
+}
+
+pkgb_export() {
+    _get_installed_pkgs
+}
+
+pkgb_upgrade() {
+    _pkgb_refresh
+    $SUDO_CMD apt-get dist-upgrade
+}
+
+pkgb_help() {
+    echo "Usage: $(basename "$0") [-c] [-s] [-n] (${ACTIONS[*]})" >&2
+}
+
+OPTIND=1 # Reset in case getopts has been used previously in the shell.
+
+while getopts 'csf' OPTION; do
+    case "$OPTION" in
+    c)
+        echo -e "\tRequested autoclean"
+        CLEAN=1
+        ;;
+
+    s)
+        echo -e "\tNot assume always assume yes"
+        ASSUMEYES=""
+        ;;
+    f)
+        echo -e "\tSkipping sources update"
+        REFRESH=0
+        ;;
+    *)
+        echo "Unknown option: $OPTARG"
+        pkgb_help
+        exit 1
+        ;;
+
+    esac
+
+done
+shift "$((OPTIND - 1))"
+
+if [[ $# -lt 1 ]]; then
+    echo "No action specified"
+    pkgb_help
+    exit 1
+fi
+
+for a in "${ACTIONS[@]}"; do
+    if [ "$a" == "$1" ]; then
+        shift
+        "pkgb_${a}" "$*"
+        if [[ $CLEAN = 1 ]]; then
+            _pkgb_clean
+        fi
+        exit 0
+    fi
+done
+echo "Unknown Action: $1"
+pkgb_help
+exit 1
