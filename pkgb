@@ -20,27 +20,43 @@ if [[ -f "$HOME/.pkgbdebug" ]]; then
     trap '_trace_handler' DEBUG
 fi
 
-_terminate_handler() {
+_fail() {
     printf '\e[0m'
-    printf '\n\e[38;2;200;0;0m%s\e[0m\n' "!! > Caught Terminate signal"
+    printf '\n\e[38;2;200;0;0m%s\e[0m\n' "FAIL: $1"
     exit 1
+}
+
+_info() {
+    printf '\e[0m'
+    printf '\e[38;2;0;200;0m%s\e[0m\n' "$1"
+}
+
+_terminate_handler() {
+    _fail "Caught terminate signal"
 }
 
 _error_handler() {
     ORIGIN=$1
     ERRNO=$2
     printf '\e[0m'
-    printf '\n\e[1m\e[48;2;236;240;241m\e[38;2;200;0;0m%s\e[0m' "!! > Internal failure. Command '$ORIGIN' failed with $ERRNO"
+    printf '\n\e[1m\e[48;2;236;240;241m\e[38;2;200;0;0m %s \e[0m' "!! > Internal failure. Command '$ORIGIN' failed with $ERRNO"
+    printf '\n'
     exit 1
 }
+
 trap '_terminate_handler' SIGINT SIGTERM
 trap '_error_handler $BASH_COMMAND $?' ERR
 
-ACTIONS=('add' 'del' 'export' 'list' 'purge' 'upgrade' 'help')
+ACTIONS=('add' 'del' 'export' 'list' 'purge' 'upgrade')
 INFO_HEADER="<ESC> Exit, <PgUp> Preview up, <PgDown> Preview down <F5> Apply"
 FZF_OPTS=("--no-height" "--multi" "--bind" "pgdn:preview-down" "--exact" "--bind" "pgup:preview-up" "--header" "$INFO_HEADER")
 
-SUDO_CMD=$(command -v sudo)
+SUDO_CMD=$(command -v sudo || echo '')
+if [[ -z "$SUDO_CMD" ]]; then
+    if [[ $EUID -ne 0 ]]; then
+        _fail 'sudo not found and current user is not root'
+    fi
+fi
 
 _get_installed_pkgs() {
     dpkg-query --show --showformat='${Package} ${db:Status-Status}\n' | grep installed | awk '{print $1}'
@@ -66,7 +82,7 @@ pkgb_add() {
     installed_pkg=$(_get_installed_pkgs)
     all_pkg=$(apt-cache pkgnames)
 
-    selection=$(echo "$installed_pkg" "$all_pkg" | tr ' ' '\n' | sort | uniq -u | fzf "${FZF_OPTS[@]}" --query="$1" --preview='apt-cache show {}' --prompt='Install packages > ' --bind "F5:accept")
+    selection=$(echo "$installed_pkg" "$all_pkg" | tr ' ' '\n' | sort | uniq -u | fzf "${FZF_OPTS[@]}" --query="$1" --preview='apt-cache show {}' --prompt='Install packages > ' --bind "F5:accept" || echo '')
     if [[ -n "$selection" ]]; then
         echo "$selection" | tr '\n' ' ' | xargs "$SUDO_CMD" apt-get install "$ASSUMEYES"
     fi
@@ -74,7 +90,7 @@ pkgb_add() {
 
 pkgb_del() {
     local selection
-    selection=$(_get_installed_pkgs | fzf "${FZF_OPTS[@]}" --preview='dpkg-query -s {}' --query="$1" --prompt='Uninstall packages > ')
+    selection=$(_get_installed_pkgs | fzf "${FZF_OPTS[@]}" --preview='dpkg-query -s {}' --query="$1" --prompt='Uninstall packages > ' || echo '')
     if [[ -n "$selection" ]]; then
         echo "$selection" | tr '\n' ' ' | xargs "$SUDO_CMD" apt-get remove "$ASSUMEYES"
     fi
@@ -82,14 +98,14 @@ pkgb_del() {
 
 pkgb_purge() {
     local selection
-    selection=$(_get_installed_pkgs | fzf "${FZF_OPTS[@]}" --preview='dpkg-query -s {}' --query="$1" --prompt='Uninstall packages > ')
+    selection=$(_get_installed_pkgs | fzf "${FZF_OPTS[@]}" --preview='dpkg-query -s {}' --query="$1" --prompt='Purge packages > ' || echo '')
     if [[ -n "$selection" ]]; then
         echo "$selection" | tr '\n' ' ' | xargs "$SUDO_CMD" apt-get purge "$ASSUMEYES"
     fi
 }
 
 pkgb_list() {
-    _get_installed_pkgs | fzf --preview='dpkg-query -s {}' --bind esc:accept --prompt='Installed packages list > ' --query="$1"
+    _get_installed_pkgs | fzf --preview='dpkg-query -s {}' --prompt='Installed packages list > ' --query="$1" || true
 }
 
 pkgb_export() {
@@ -102,28 +118,37 @@ pkgb_upgrade() {
 }
 
 pkgb_help() {
-    echo "Usage: $(basename "$0") [-c] [-s] [-n] (${ACTIONS[*]})" >&2
+    echo "Usage: $(basename "$0") [-c] [-s] [-f] [-h] (${ACTIONS[*]}) [QUERY]" >&2
+    echo -e '\nOptions:'
+    echo -e '\t -c: Will run autoremove after action'
+    echo -e '\t -s: Safe execute. Disables "always assume yes" for apt'
+    echo -e '\t -f: Fast execute. Skip "apt-get update" before action'
+    echo -e '\t -h: Show help and exit'
 }
 
 OPTIND=1 # Reset in case getopts has been used previously in the shell.
 
-while getopts 'csf' OPTION; do
+while getopts 'csfh' OPTION; do
     case "$OPTION" in
     c)
-        echo -e "\tRequested autoclean"
+        _info "-> Requested autoclean"
         CLEAN=1
         ;;
 
     s)
-        echo -e "\tNot assume always assume yes"
+        _info "-> Not assume always assume yes"
         ASSUMEYES=""
         ;;
     f)
-        echo -e "\tSkipping sources update"
+        _info "-> Skipping source update"
         REFRESH=0
         ;;
+    h)
+        pkgb_help
+        exit 1
+        ;;
     *)
-        echo "Unknown option: $OPTARG"
+        echo "Invalid option"
         pkgb_help
         exit 1
         ;;
