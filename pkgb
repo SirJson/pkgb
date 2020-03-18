@@ -47,7 +47,7 @@ _error_handler() {
 trap '_terminate_handler' SIGINT SIGTERM
 trap '_error_handler $BASH_COMMAND $?' ERR
 
-ACTIONS=('add' 'del' 'export' 'list' 'purge' 'upgrade')
+ACTIONS=('add' 'del' 'export' 'list' 'purge' 'upgrade' 'checkout')
 INFO_HEADER="<ESC> Exit, <PgUp> Preview up, <PgDown> Preview down <F5> Apply"
 FZF_OPTS=("--no-height" "--multi" "--bind" "pgdn:preview-down" "--exact" "--bind" "pgup:preview-up" "--header" "$INFO_HEADER")
 
@@ -105,7 +105,19 @@ pkgb_purge() {
 }
 
 pkgb_list() {
-    _get_installed_pkgs | fzf --preview='dpkg-query -s {}' --prompt='Installed packages list > ' --query="$1" || true
+    _get_installed_pkgs | fzf --preview='dpkg-query -s {}; printf "\n -- Installed Files --\n"; dpkg-query -L {}' --prompt='Installed packages > ' --query="$1" || true
+}
+
+pkgb_checkout() {
+    local selection
+    local goto
+    selection=$(_get_installed_pkgs | fzf --preview='printf "\n -- Installed Files --\n"; dpkg-query -L {}' --prompt='Installed packages > ' --query="$1" || true)
+    if [[ -n "$selection" ]]; then
+        goto=$(dpkg-query -L "$selection" | fzf --prompt='Goto >' || true)
+        if [[ -n "$goto" ]]; then
+            sh -c "cd $goto; exec $SHELL"
+        fi
+    fi
 }
 
 pkgb_export() {

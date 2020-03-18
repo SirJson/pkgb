@@ -18,7 +18,7 @@ This script will request root if required or sudo if installed on your system.
 ## Usage
 
 ```sh
-pkgb [-c] [-s] [-f] [-h] (add del export list purge upgrade) [QUERY]
+pkgb [-c] [-s] [-f] [-h] (add del export list purge upgrade checkout) [QUERY]
 ```
 
 Where `QUERY` is a optional search string that will be given to the fuzzy searcher at the start.
@@ -40,6 +40,7 @@ If the action you choose doesn't need fzf this parameter will be ignored
 - `list`: Will show you a list of installed packages on this system with additional information in the preview window
 - `export`: Writes a list of all installed packages on this system to stdout.
 - `upgrade`: Find, download and apply all availiable upgrades to your system packages
+- `checkout`: Will show you a list of installed packages. After selecting a packgage you can checkout a specific path the package created on your system.
 
 ## Examples
 
