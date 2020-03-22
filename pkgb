@@ -5,6 +5,7 @@ _DEBUGPIPE=''
 CLEAN=0
 REFRESH=1
 ASSUMEYES="-y"
+EXACT="--exact"
 
 if [[ -f "$HOME/.pkgbdebug" ]]; then
     _DEBUGPIPE=$(mktemp)
@@ -49,7 +50,6 @@ trap '_error_handler $BASH_COMMAND $?' ERR
 
 ACTIONS=('add' 'del' 'export' 'list' 'purge' 'upgrade' 'checkout')
 INFO_HEADER="<ESC> Exit, <PgUp> Preview up, <PgDown> Preview down <F5> Apply"
-FZF_OPTS=("--no-height" "--multi" "--bind" "pgdn:preview-down" "--exact" "--bind" "pgup:preview-up" "--header" "$INFO_HEADER")
 
 SUDO_CMD=$(command -v sudo || echo '')
 if [[ -z "$SUDO_CMD" ]]; then
@@ -140,13 +140,16 @@ pkgb_help() {
 
 OPTIND=1 # Reset in case getopts has been used previously in the shell.
 
-while getopts 'csfh' OPTION; do
+while getopts 'csfhu' OPTION; do
     case "$OPTION" in
     c)
         _info "-> Requested autoclean"
         CLEAN=1
         ;;
-
+    u)
+        _info "-> Disabled exact mode"
+        EXACT=""
+        ;;
     s)
         _info "-> Not assume always assume yes"
         ASSUMEYES=""
@@ -175,6 +178,8 @@ if [[ $# -lt 1 ]]; then
     pkgb_help
     exit 1
 fi
+
+FZF_OPTS=("--no-height" "--multi" "--bind" "pgdn:preview-down" $EXACT "--bind" "pgup:preview-up" "--header" "$INFO_HEADER")
 
 for a in "${ACTIONS[@]}"; do
     if [ "$a" == "$1" ]; then
