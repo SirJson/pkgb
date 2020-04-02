@@ -1,0 +1,164 @@
+#!/bin/bash
+# shellcheck disable=SC2086
+set -Euo pipefail
+_DEBUGPIPE=''
+
+CLEAN=0
+REFRESH=1
+EXACT="--exact"
+
+if [[ -f "$HOME/.pkgbdebug" ]]; then
+    _DEBUGPIPE=$(mktemp)
+    echo "Started in Debug mode!"
+    echo "Debug pipe: $_DEBUGPIPE"
+    _trace_handler() {
+        if [[ ! -p $_DEBUGPIPE ]]; then
+            mkfifo "$_DEBUGPIPE"
+        fi
+        echo -e "\n[DBG]➜\t$BASH_COMMAND" &>"$_DEBUGPIPE"
+    }
+    set -o functrace
+    trap '_trace_handler' DEBUG
+fi
+
+_fail() {
+    printf '\e[0m'
+    printf '\n\e[38;2;200;0;0m%s\e[0m\n' "FAIL: $1"
+    exit 1
+}
+
+_info() {
+    printf '\e[0m'
+    printf '\e[38;2;0;200;0m%s\e[0m\n' "$1"
+}
+
+_terminate_handler() {
+    _fail "Caught terminate signal"
+}
+
+_error_handler() {
+    ORIGIN=$1
+    ERRNO=$2
+    printf '\e[0m'
+    printf '\n\e[1m\e[48;2;236;240;241m\e[38;2;200;0;0m %s \e[0m' "!! > Internal failure. Command '$ORIGIN' failed with $ERRNO"
+    printf '\n'
+    exit 1
+}
+
+trap '_terminate_handler' SIGINT SIGTERM
+trap '_error_handler $BASH_COMMAND $?' ERR
+
+ACTIONS=('add' 'del' 'export' 'list' 'upgrade')
+INFO_HEADER="<ESC> Exit, <PgUp> Preview up, <PgDown> Preview down <F5> Apply"
+
+SUDO_CMD=$(command -v sudo || echo '')
+if [[ -z "$SUDO_CMD" ]]; then
+    if [[ $EUID -ne 0 ]]; then
+        _fail 'sudo not found and current user is not root'
+    fi
+fi
+
+_get_installed_pkgs() {
+    pacman -Qnq
+}
+
+_pkgb_clean() {
+    $SUDO_CMD pacman -Rns $(pacman -Qtdq)
+    $SUDO_CMD pacman -Sc
+    $SUDO_CMD pacman -Qdtq | pacman -Rs -
+}
+
+_pkgb_refresh() {
+    if [[ $REFRESH = 1 ]]; then
+        $SUDO_CMD pacman -Sy
+    fi
+}
+
+pkgb_add() {
+    local installed_pkg
+    local all_pkg
+    local selection
+
+    installed_pkg=$(_get_installed_pkgs)
+    all_pkg=$(pacman -Slq)
+
+    selection=$(echo "$installed_pkg" "$all_pkg" | tr ' ' '\n' | sort | uniq -u | fzf "${FZF_OPTS[@]}" --query="$1" --preview='pacman -Si {}' --prompt='Install packages > ' --bind "F5:accept" || echo '')
+    if [[ -n "$selection" ]]; then
+        cmd=$(echo "$selection" | tr '\n' ' ')
+        "$SUDO_CMD" pacman -Syu $cmd
+    fi
+}
+
+pkgb_del() {
+    local selection
+    selection=$(_get_installed_pkgs | fzf "${FZF_OPTS[@]}" --preview='pacman -Qil {}' --query="$1" --prompt='Uninstall packages > ' || echo '')
+    if [[ -n "$selection" ]]; then
+        cmd=$(echo "$selection" | tr '\n' ' ')
+        "$SUDO_CMD" pacman -Rs $cmd
+    fi
+}
+
+pkgb_list() {
+    _get_installed_pkgs | fzf --preview='pacman -Qil {}' --prompt='Installed packages > ' --query="$1" || true
+}
+
+pkgb_export() {
+    _get_installed_pkgs
+}
+
+pkgb_upgrade() {
+    $SUDO_CMD pacman -Syu
+}
+
+pkgb_help() {
+    echo "Usage: $(basename "$0") [-c] [-u] [-h] (${ACTIONS[*]}) [QUERY]" >&2
+}
+
+OPTIND=1 # Reset in case getopts has been used previously in the shell.
+
+while getopts 'chu' OPTION; do
+    case "$OPTION" in
+    c)
+        _info "-> Requested autoclean"
+        CLEAN=1
+        ;;
+    u)
+        _info "-> Disabled exact mode"
+        EXACT=""
+        ;;
+    h)
+        pkgb_help
+        exit 1
+        ;;
+    *)
+        echo "Invalid option"
+        pkgb_help
+        exit 1
+        ;;
+
+    esac
+
+done
+shift "$((OPTIND - 1))"
+
+if [[ $# -lt 1 ]]; then
+    echo "No action specified"
+    pkgb_help
+    exit 1
+fi
+
+FZF_OPTS=("--no-height" "--multi" "--bind" "pgdn:preview-down" "$EXACT" "--bind" "pgup:preview-up" "--header" "$INFO_HEADER")
+
+for a in "${ACTIONS[@]}"; do
+    if [ "$a" == "$1" ]; then
+        shift
+        "pkgb_${a}" "$*"
+        if [[ $CLEAN = 1 ]]; then
+            _pkgb_clean
+        fi
+        exit 0
+    fi
+done
+echo "Unknown Action: $1"
+pkgb_help
+exit 1
