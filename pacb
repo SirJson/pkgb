@@ -48,7 +48,7 @@ _error_handler() {
 trap '_terminate_handler' SIGINT SIGTERM
 trap '_error_handler $BASH_COMMAND $?' ERR
 
-ACTIONS=('add' 'del' 'export' 'list' 'upgrade')
+ACTIONS=('add' 'del' 'export' 'list' 'upgrade' 'addgroup')
 INFO_HEADER="<ESC> Exit, <PgUp> Preview up, <PgDown> Preview down <F5> Apply"
 
 SUDO_CMD=$(command -v sudo || echo '')
@@ -59,18 +59,32 @@ if [[ -z "$SUDO_CMD" ]]; then
 fi
 
 _get_installed_pkgs() {
-    pacman -Qnq
+    pacman -Qq
+}
+
+_get_groups() {
+    pacman -Qg | awk '{if (a[$1]++ == 0){print $1}}'
 }
 
 _pkgb_clean() {
-    $SUDO_CMD pacman -Rns $(pacman -Qtdq)
+    $SUDO_CMD pacman -Rns "$(pacman -Qtdq)"
     $SUDO_CMD pacman -Sc
-    $SUDO_CMD pacman -Qdtq | pacman -Rs -
 }
 
 _pkgb_refresh() {
     if [[ $REFRESH = 1 ]]; then
         $SUDO_CMD pacman -Sy
+    fi
+}
+
+pkgb_addgroup() {
+    local groups
+    local selection
+    groups=$(_get_groups)
+    selection=$(echo "$groups" | tr ' ' '\n' | sort | uniq -u | fzf "${FZF_OPTS[@]}" --query="$1" --preview='pacman -Si {}' --prompt='Install packages > ' --bind "F5:accept" || echo '')
+    if [[ -n "$selection" ]]; then
+        cmd=$(echo "$selection" | tr '\n' ' ')
+        "$SUDO_CMD" pacman -Syu $cmd
     fi
 }
 
