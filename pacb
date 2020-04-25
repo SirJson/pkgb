@@ -48,7 +48,7 @@ _error_handler() {
 trap '_terminate_handler' SIGINT SIGTERM
 trap '_error_handler $BASH_COMMAND $?' ERR
 
-ACTIONS=('add' 'del' 'export' 'list' 'upgrade' 'addgroup')
+ACTIONS=('add' 'del' 'export' 'list' 'upgrade' 'addgroup' 'browse')
 INFO_HEADER="<ESC> Exit, <PgUp> Preview up, <PgDown> Preview down <F5> Apply"
 
 SUDO_CMD=$(command -v sudo || echo '')
@@ -101,6 +101,16 @@ pkgb_add() {
         cmd=$(echo "$selection" | tr '\n' ' ')
         "$SUDO_CMD" pacman -Syu $cmd
     fi
+}
+
+pkgb_browse() {
+    local installed_pkg
+    local all_pkg
+    local selection
+
+    all_pkg=$(pacman -Slq)
+
+    echo "$all_pkg" | tr ' ' '\n' | fzf "${FZF_OPTS[@]}" --query="$1" --preview='pacman -Si {}' --prompt='Packages > ' --bind "F5:accept" || echo ''
 }
 
 pkgb_del() {
