@@ -48,7 +48,7 @@ _error_handler() {
 trap '_terminate_handler' SIGINT SIGTERM
 trap '_error_handler $BASH_COMMAND $?' ERR
 
-ACTIONS=('add' 'del' 'export' 'list' 'purge' 'upgrade' 'checkout')
+ACTIONS=('add' 'del' 'export' 'list' 'purge' 'upgrade' 'checkout', 'repair')
 INFO_HEADER="<ESC> Exit, <PgUp> Preview up, <PgDown> Preview down <F5> Apply"
 
 SUDO_CMD=$(command -v sudo || echo '')
@@ -72,6 +72,11 @@ _pkgb_refresh() {
     fi
 }
 
+pkgb_repair() {
+    echo "Trying to repair broken system state"
+    apt install --fix-broken
+}
+
 pkgb_add() {
     local installed_pkg
     local all_pkg
@@ -83,24 +88,36 @@ pkgb_add() {
     all_pkg=$(apt-cache pkgnames)
 
     selection=$(echo "$installed_pkg" "$all_pkg" | tr ' ' '\n' | sort | uniq -u | fzf "${FZF_OPTS[@]}" --query="$1" --preview='apt-cache show {}' --prompt='Install packages > ' --bind "F5:accept" || echo '')
+    echo "-- Selected packages --"
+    echo "$selection"
+
     if [[ -n "$selection" ]]; then
-        echo "$selection" | tr '\n' ' ' | xargs "$SUDO_CMD" apt-get install "$ASSUMEYES"
+        cmd=$(echo "$selection" | tr '\n' ' ')
+        "$SUDO_CMD" apt-get install $cmd "$ASSUMEYES"
     fi
 }
 
 pkgb_del() {
     local selection
     selection=$(_get_installed_pkgs | fzf "${FZF_OPTS[@]}" --preview='dpkg-query -s {}' --query="$1" --prompt='Uninstall packages > ' || echo '')
+    echo "-- Selected packages --"
+    echo "$selection"
+
     if [[ -n "$selection" ]]; then
-        echo "$selection" | tr '\n' ' ' | xargs "$SUDO_CMD" apt-get remove "$ASSUMEYES"
+        cmd=$(echo "$selection" | tr '\n' ' ')
+        "$SUDO_CMD" apt-get remove $cmd "$ASSUMEYES"
     fi
 }
 
 pkgb_purge() {
     local selection
     selection=$(_get_installed_pkgs | fzf "${FZF_OPTS[@]}" --preview='dpkg-query -s {}' --query="$1" --prompt='Purge packages > ' || echo '')
+    echo "-- Selected packages --"
+    echo "$selection"
+
     if [[ -n "$selection" ]]; then
-        echo "$selection" | tr '\n' ' ' | xargs "$SUDO_CMD" apt-get purge "$ASSUMEYES"
+        cmd=$(echo "$selection" | tr '\n' ' ')
+        "$SUDO_CMD" apt-get purge $cmd "$ASSUMEYES"
     fi
 }
 
