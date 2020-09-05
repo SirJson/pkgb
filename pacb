@@ -81,7 +81,7 @@ pkgb_addgroup() {
     local groups
     local selection
     groups=$(_get_groups)
-    selection=$(echo "$groups" | tr ' ' '\n' | sort | uniq -u | fzf "${FZF_OPTS[@]}" --query="$1" --preview='pacman -Si {}' --prompt='Install packages > ' --bind "F5:accept" || echo '')
+    selection=$(echo "$groups" | tr ' ' '\n' | sort | uniq -u | sk "${SK_OPTS[@]}" --query="$1" --preview='pacman -Si {}' --prompt='Install packages > ' --bind "F5:accept" || echo '')
     if [[ -n "$selection" ]]; then
         cmd=$(echo "$selection" | tr '\n' ' ')
         "$SUDO_CMD" pacman -Syu $cmd
@@ -96,7 +96,7 @@ pkgb_add() {
     installed_pkg=$(_get_installed_pkgs)
     all_pkg=$(pacman -Slq)
 
-    selection=$(echo "$installed_pkg" "$all_pkg" | tr ' ' '\n' | sort | uniq -u | fzf "${FZF_OPTS[@]}" --query="$1" --preview='pacman -Si {}' --prompt='Install packages > ' --bind "F5:accept" || echo '')
+    selection=$(echo "$installed_pkg" "$all_pkg" | tr ' ' '\n' | sort | uniq -u | sk "${SK_OPTS[@]}" --query="$1" --preview='pacman -Si {}' --prompt='Install packages > ' --bind "F5:accept" || echo '')
     if [[ -n "$selection" ]]; then
         cmd=$(echo "$selection" | tr '\n' ' ')
         "$SUDO_CMD" pacman -Syu $cmd
@@ -110,12 +110,12 @@ pkgb_browse() {
 
     all_pkg=$(pacman -Slq)
 
-    echo "$all_pkg" | tr ' ' '\n' | fzf "${FZF_OPTS[@]}" --query="$1" --preview='pacman -Si {}' --prompt='Packages > ' --bind "F5:accept" || echo ''
+    echo "$all_pkg" | tr ' ' '\n' | sk "${SK_OPTS[@]}" --query="$1" --preview='pacman -Si {}' --prompt='Packages > ' --bind "F5:accept" || echo ''
 }
 
 pkgb_del() {
     local selection
-    selection=$(_get_installed_pkgs | fzf "${FZF_OPTS[@]}" --preview='pacman -Qil {}' --query="$1" --prompt='Uninstall packages > ' || echo '')
+    selection=$(_get_installed_pkgs | sk "${SK_OPTS[@]}" --preview='pacman -Qil {}' --query="$1" --prompt='Uninstall packages > ' || echo '')
     if [[ -n "$selection" ]]; then
         cmd=$(echo "$selection" | tr '\n' ' ')
         "$SUDO_CMD" pacman -Rs $cmd
@@ -123,7 +123,7 @@ pkgb_del() {
 }
 
 pkgb_list() {
-    _get_installed_pkgs | fzf --preview='pacman -Qil {}' --prompt='Installed packages > ' --query="$1" || true
+    _get_installed_pkgs | sk --preview='pacman -Qil {}' --prompt='Installed packages > ' --query="$1" || true
 }
 
 pkgb_export() {
@@ -171,7 +171,7 @@ if [[ $# -lt 1 ]]; then
     exit 1
 fi
 
-FZF_OPTS=("--no-height" "--multi" "--bind" "pgdn:preview-down" "$EXACT" "--bind" "pgup:preview-up" "--header" "$INFO_HEADER")
+SK_OPTS=("--no-height" "--multi" "--bind" "pgdn:preview-down" "$EXACT" "--bind" "pgup:preview-up" "--header" "$INFO_HEADER")
 
 for a in "${ACTIONS[@]}"; do
     if [ "$a" == "$1" ]; then
