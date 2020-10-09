@@ -6,6 +6,7 @@ _DEBUGPIPE=''
 CLEAN=0
 REFRESH=1
 EXACT="--exact"
+FUZZER=""
 
 if [[ -f "$HOME/.pkgbdebug" ]]; then
     _DEBUGPIPE=$(mktemp)
@@ -81,7 +82,7 @@ pkgb_addgroup() {
     local groups
     local selection
     groups=$(_get_groups)
-    selection=$(echo "$groups" | tr ' ' '\n' | sort | uniq -u | sk "${SK_OPTS[@]}" --query="$1" --preview='pacman -Si {}' --prompt='Install packages > ' --bind "F5:accept" || echo '')
+    selection=$(echo "$groups" | tr ' ' '\n' | sort | uniq -u | "$FUZZER" "${FUZZER_OPTS[@]}" --query="$1" --preview='pacman -Si {}' --prompt='Install packages > ' --bind "F5:accept" || echo '')
     if [[ -n "$selection" ]]; then
         cmd=$(echo "$selection" | tr '\n' ' ')
         "$SUDO_CMD" pacman -Syu $cmd
@@ -96,7 +97,7 @@ pkgb_add() {
     installed_pkg=$(_get_installed_pkgs)
     all_pkg=$(pacman -Slq)
 
-    selection=$(echo "$installed_pkg" "$all_pkg" | tr ' ' '\n' | sort | uniq -u | sk "${SK_OPTS[@]}" --query="$1" --preview='pacman -Si {}' --prompt='Install packages > ' --bind "F5:accept" || echo '')
+    selection=$(echo "$installed_pkg" "$all_pkg" | tr ' ' '\n' | sort | uniq -u | "$FUZZER" "${FUZZER_OPTS[@]}" --query="$1" --preview='pacman -Si {}' --prompt='Install packages > ' --bind "F5:accept" || echo '')
     if [[ -n "$selection" ]]; then
         cmd=$(echo "$selection" | tr '\n' ' ')
         "$SUDO_CMD" pacman -Syu $cmd
@@ -110,12 +111,12 @@ pkgb_browse() {
 
     all_pkg=$(pacman -Slq)
 
-    echo "$all_pkg" | tr ' ' '\n' | sk "${SK_OPTS[@]}" --query="$1" --preview='pacman -Si {}' --prompt='Packages > ' --bind "F5:accept" || echo ''
+    echo "$all_pkg" | tr ' ' '\n' | "$FUZZER" "${FUZZER_OPTS[@]}" --query="$1" --preview='pacman -Si {}' --prompt='Packages > ' --bind "F5:accept" || echo ''
 }
 
 pkgb_del() {
     local selection
-    selection=$(_get_installed_pkgs | sk "${SK_OPTS[@]}" --preview='pacman -Qil {}' --query="$1" --prompt='Uninstall packages > ' || echo '')
+    selection=$(_get_installed_pkgs | "$FUZZER" "${FUZZER_OPTS[@]}" --preview='pacman -Qil {}' --query="$1" --prompt='Uninstall packages > ' || echo '')
     if [[ -n "$selection" ]]; then
         cmd=$(echo "$selection" | tr '\n' ' ')
         "$SUDO_CMD" pacman -Rs $cmd
@@ -123,7 +124,7 @@ pkgb_del() {
 }
 
 pkgb_list() {
-    _get_installed_pkgs | sk --preview='pacman -Qil {}' --prompt='Installed packages > ' --query="$1" || true
+    _get_installed_pkgs | "$FUZZER" --preview='pacman -Qil {}' --prompt='Installed packages > ' --query="$1" || true
 }
 
 pkgb_export() {
@@ -171,7 +172,17 @@ if [[ $# -lt 1 ]]; then
     exit 1
 fi
 
-SK_OPTS=("--no-height" "--multi" "--bind" "pgdn:preview-down" "$EXACT" "--bind" "pgup:preview-up" "--header" "$INFO_HEADER")
+if _installed "sk" then;
+    FUZZER="sk"
+    echo "Using sk"
+elif _installed "fzf" then;
+    FUZZER="fzf"
+    echo "Using fzf"
+else
+    _fail "No fuzzy matcher installed. Please install fzf or sk!"
+fi
+
+FUZZER_OPTS=("--no-height" "--multi" "--bind" "pgdn:preview-down" "$EXACT" "--bind" "pgup:preview-up" "--header" "$INFO_HEADER")
 
 for a in "${ACTIONS[@]}"; do
     if [ "$a" == "$1" ]; then

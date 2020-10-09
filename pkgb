@@ -6,6 +6,7 @@ CLEAN=0
 REFRESH=1
 ASSUMEYES="-y"
 EXACT="--exact"
+FUZZER=""
 
 if [[ -f "$HOME/.pkgbdebug" ]]; then
     _DEBUGPIPE=$(mktemp)
@@ -58,6 +59,13 @@ if [[ -z "$SUDO_CMD" ]]; then
     fi
 fi
 
+_installed() {
+    local result
+    command -v "$1" &> /dev/null
+    result=$?
+    return $result
+}
+
 _get_installed_pkgs() {
     dpkg-query --show --showformat='${Package} ${db:Status-Status}\n' | grep installed | awk '{print $1}'
 }
@@ -87,7 +95,7 @@ pkgb_add() {
     installed_pkg=$(_get_installed_pkgs)
     all_pkg=$(apt-cache pkgnames)
 
-    selection=$(echo "$installed_pkg" "$all_pkg" | tr ' ' '\n' | sort | uniq -u | sk "${SK_OPTS[@]}" --query="$1" --preview='apt-cache show {}' --prompt='Install packages > ' --bind "F5:accept" || echo '')
+    selection=$(echo "$installed_pkg" "$all_pkg" | tr ' ' '\n' | sort | uniq -u | "$FUZZER" "${FUZZER_OPTS[@]}" --query="$1" --preview='apt-cache show {}' --prompt='Install packages > ' --bind "F5:accept" || echo '')
     echo "-- Selected packages --"
     echo "$selection"
 
@@ -99,7 +107,7 @@ pkgb_add() {
 
 pkgb_del() {
     local selection
-    selection=$(_get_installed_pkgs | sk "${SK_OPTS[@]}" --preview='dpkg-query -s {}' --query="$1" --prompt='Uninstall packages > ' || echo '')
+    selection=$(_get_installed_pkgs | "$FUZZER" "${FUZZER_OPTS[@]}" --preview='dpkg-query -s {}' --query="$1" --prompt='Uninstall packages > ' || echo '')
     echo "-- Selected packages --"
     echo "$selection"
 
@@ -111,7 +119,7 @@ pkgb_del() {
 
 pkgb_purge() {
     local selection
-    selection=$(_get_installed_pkgs | sk "${SK_OPTS[@]}" --preview='dpkg-query -s {}' --query="$1" --prompt='Purge packages > ' || echo '')
+    selection=$(_get_installed_pkgs | "$FUZZER" "${FUZZER_OPTS[@]}" --preview='dpkg-query -s {}' --query="$1" --prompt='Purge packages > ' || echo '')
     echo "-- Selected packages --"
     echo "$selection"
 
@@ -122,15 +130,15 @@ pkgb_purge() {
 }
 
 pkgb_list() {
-    _get_installed_pkgs | sk --preview='dpkg-query -s {}; printf "\n -- Installed Files --\n"; dpkg-query -L {}' --prompt='Installed packages > ' --query="$1" || true
+    _get_installed_pkgs | "$FUZZER" --preview='dpkg-query -s {}; printf "\n -- Installed Files --\n"; dpkg-query -L {}' --prompt='Installed packages > ' --query="$1" || true
 }
 
 pkgb_checkout() {
     local selection
     local goto
-    selection=$(_get_installed_pkgs | sk --preview='printf "\n -- Installed Files --\n"; dpkg-query -L {}' --prompt='Installed packages > ' --query="$1" || true)
+    selection=$(_get_installed_pkgs | "$FUZZER" --preview='printf "\n -- Installed Files --\n"; dpkg-query -L {}' --prompt='Installed packages > ' --query="$1" || true)
     if [[ -n "$selection" ]]; then
-        goto=$(dpkg-query -L "$selection" | sk --prompt='Goto >' || true)
+        goto=$(dpkg-query -L "$selection" | "$FUZZER" --prompt='Goto >' || true)
         if [[ -n "$goto" ]]; then
             sh -c "cd $goto; exec $SHELL"
         fi
@@ -196,7 +204,17 @@ if [[ $# -lt 1 ]]; then
     exit 1
 fi
 
-SK_OPTS=("--no-height" "--multi" "--bind" "pgdn:preview-down" $EXACT "--bind" "pgup:preview-up" "--header" "$INFO_HEADER")
+if _installed "sk" then;
+    FUZZER="sk"
+    echo "Using sk"
+elif _installed "fzf" then;
+    FUZZER="fzf"
+    echo "Using fzf"
+else
+    _fail "No fuzzy matcher installed. Please install fzf or sk!"
+fi
+
+FUZZER_OPTS=("--no-height" "--multi" "--bind" "pgdn:preview-down" $EXACT "--bind" "pgup:preview-up" "--header" "$INFO_HEADER")
 
 for a in "${ACTIONS[@]}"; do
     if [ "$a" == "$1" ]; then
