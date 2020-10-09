@@ -1,4 +1,4 @@
-# packagebuddy
+# pkgb
 
 Simpel bash script alternative to aptitude or synaptic.
 Inspired by [fzf-apt](https://github.com/krickelkrakel/fzf-apt).
