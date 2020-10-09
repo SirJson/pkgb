@@ -5,13 +5,13 @@ Inspired by [fzf-apt](https://github.com/krickelkrakel/fzf-apt).
 
 ## Features
 
-- Package info preview
-- Exact search
-- Local package information query
-- Install / Uninstall directly from script
-- Convenience functions for everyday apt related tasks
+- Supports both fzf and skim
+- Preview package info before installing
+- Query what packages are already installed and what is known about them (for example: Where do all the files end up)
+- Install / Uninstall directly from your own script
+- Convenience functions for everyday package mangager related tasks
 
-Depends on [fzf](https://github.com/junegunn/fzf), bash, awk and other coreutils.
+Depends on [fzf](https://github.com/junegunn/fzf) or [skim](https://github.com/lotabout/skim), bash, awk and coreutils.
 
 This script will request root if required or sudo if installed on your system.
 
@@ -33,6 +33,8 @@ If the action you choose doesn't need fzf this parameter will be ignored
 - `-h`: Show help
 
 ### Actions
+
+> NOTE: Depending on your package manager the more advanced features are not available
 
 - `add`: Allows installing one or more packages from a list of available packages.
 - `del`: Allows removing one or more packages from a list of installed packages.
