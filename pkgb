@@ -204,10 +204,10 @@ if [[ $# -lt 1 ]]; then
     exit 1
 fi
 
-if _installed "sk" then;
+if _installed "sk"; then
     FUZZER="sk"
     echo "Using sk"
-elif _installed "fzf" then;
+elif _installed "fzf"; then
     FUZZER="fzf"
     echo "Using fzf"
 else
