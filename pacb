@@ -46,6 +46,14 @@ _error_handler() {
     exit 1
 }
 
+
+_installed() {
+    local result
+    command -v "$1" &> /dev/null
+    result=$?
+    return $result
+}
+
 trap '_terminate_handler' SIGINT SIGTERM
 trap '_error_handler $BASH_COMMAND $?' ERR
 
